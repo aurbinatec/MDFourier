@@ -38,6 +38,10 @@
 #include "loadfile.h"
 #include "profile.h"
 
+#ifdef OPENMP_ENABLE
+	#include <omp.h>
+#endif
+
 int LoadAndProcessAudioFiles(AudioSignal **ReferenceSignal, AudioSignal **ComparisonSignal, parameters *config);
 int ProcessSignal(AudioSignal *Signal, parameters *config);
 int ExecuteDFFT(AudioBlocks *AudioArray, double *samples, size_t size, double samplerate, double *window, int AudioChannels, int ZeroPad, parameters *config);

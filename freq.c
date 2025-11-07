@@ -33,6 +33,10 @@
 #include "float.h"
 #include "profile.h"
 
+#ifdef OPENMP_ENABLE
+	#include <omp.h>
+#endif
+
 #define SORT_NAME FFT_Frequency_Magnitude
 #define SORT_TYPE Frequency
 #define SORT_CMP(x, y)  ((x).magnitude > (y).magnitude ? -1 : ((x).magnitude == (y).magnitude ? 0 : 1))
@@ -2163,6 +2167,63 @@ void GlobalNormalize(AudioSignal *Signal, parameters *config)
 		return;
 
 	// Find global peak 
+#ifdef OPENMP_ENABLE
+	#pragma omp parallel
+	{
+		double		localMaxMagnitude = 0;
+		double		localMaxFreq = 0;
+		int			localMaxBlock = -1;
+		
+		#pragma omp for
+		for(int block = 0; block < config->types.totalBlocks; block++)
+		{
+			int type = TYPE_NOTYPE;
+
+			type = GetBlockType(config, block);
+			if(type >= TYPE_SILENCE)
+			{
+				size = GetBlockFreqSize(Signal, block, CHANNEL_LEFT, config);
+				for(long int i = 0; i < size; i++)
+				{
+					if(!Signal->Blocks[block].freq[i].hertz)
+						break;
+					if(Signal->Blocks[block].freq[i].magnitude > localMaxMagnitude)
+					{
+						localMaxMagnitude = Signal->Blocks[block].freq[i].magnitude;
+						localMaxFreq = Signal->Blocks[block].freq[i].hertz;
+						localMaxBlock = block;
+					}
+				}
+
+				if(Signal->Blocks[block].freqRight)
+				{
+					size = GetBlockFreqSize(Signal, block, CHANNEL_RIGHT, config);
+					for(long int i = 0; i < size; i++)
+					{
+						if(!Signal->Blocks[block].freqRight[i].hertz)
+							break;
+						if(Signal->Blocks[block].freqRight[i].magnitude > localMaxMagnitude)
+						{
+							localMaxMagnitude = Signal->Blocks[block].freqRight[i].magnitude;
+							localMaxFreq = Signal->Blocks[block].freqRight[i].hertz;
+							localMaxBlock = block;
+						}
+					}
+				}
+			}
+		}
+		
+		#pragma omp critical
+		{
+			if(localMaxMagnitude > MaxMagnitude)
+			{
+				MaxMagnitude = localMaxMagnitude;
+				MaxFreq = localMaxFreq;
+				MaxBlock = localMaxBlock;
+			}
+		}
+	}
+#else
 	for(int block = 0; block < config->types.totalBlocks; block++)
 	{
 		int type = TYPE_NOTYPE;
@@ -2200,6 +2261,7 @@ void GlobalNormalize(AudioSignal *Signal, parameters *config)
 			}
 		}
 	}
+#endif
 
 	if(config->verbose&& MaxBlock != -1) {
 		logmsg(" - MAX Amplitude found in block %d at %g Hz with %g magnitude\n", MaxBlock, MaxFreq, MaxMagnitude);
@@ -2210,6 +2272,9 @@ void GlobalNormalize(AudioSignal *Signal, parameters *config)
 	Signal->MaxMagnitude.block = MaxBlock;
 
 	// Normalize and calculate Amplitude in dBFSs 
+#ifdef OPENMP_ENABLE
+	#pragma omp parallel for
+#endif
 	for(int block = 0; block < config->types.totalBlocks; block++)
 	{
 		int type = TYPE_NOTYPE;
@@ -2254,6 +2319,65 @@ void FindMaxMagnitude(AudioSignal *Signal, parameters *config)
 		return;
 
 	// Find global peak
+#ifdef OPENMP_ENABLE
+	#pragma omp parallel
+	{
+		double		localMaxMagnitude = 0;
+		double		localMaxFreq = 0;
+		int			localMaxBlock = -1;
+		char		localMaxChannel = CHANNEL_NONE;
+		
+		#pragma omp for
+		for(int block = 0; block < config->types.totalBlocks; block++)
+		{
+			int type = TYPE_NOTYPE;
+
+			type = GetBlockType(config, block);
+			if(type > TYPE_SILENCE || type == TYPE_WATERMARK)
+			{
+				for(long int i = 0; i < config->MaxFreq; i++)
+				{
+					if(!Signal->Blocks[block].freq[i].hertz)
+						break;
+					if(Signal->Blocks[block].freq[i].magnitude > localMaxMagnitude)
+					{
+						localMaxMagnitude = Signal->Blocks[block].freq[i].magnitude;
+						localMaxFreq = Signal->Blocks[block].freq[i].hertz;
+						localMaxBlock = block;
+						localMaxChannel = CHANNEL_LEFT;
+					}
+				}
+
+				if(Signal->Blocks[block].freqRight)
+				{
+					for(long int i = 0; i < config->MaxFreq; i++)
+					{
+						if(!Signal->Blocks[block].freqRight[i].hertz)
+							break;
+						if(Signal->Blocks[block].freqRight[i].magnitude > localMaxMagnitude)
+						{
+							localMaxMagnitude = Signal->Blocks[block].freqRight[i].magnitude;
+							localMaxFreq = Signal->Blocks[block].freqRight[i].hertz;
+							localMaxBlock = block;	
+							localMaxChannel = CHANNEL_RIGHT;
+						}
+					}
+				}
+			}
+		}
+		
+		#pragma omp critical
+		{
+			if(localMaxMagnitude > MaxMagnitude)
+			{
+				MaxMagnitude = localMaxMagnitude;
+				MaxFreq = localMaxFreq;
+				MaxBlock = localMaxBlock;
+				MaxChannel = localMaxChannel;
+			}
+		}
+	}
+#else
 	for(int block = 0; block < config->types.totalBlocks; block++)
 	{
 		int type = TYPE_NOTYPE;
@@ -2291,6 +2415,7 @@ void FindMaxMagnitude(AudioSignal *Signal, parameters *config)
 			}
 		}
 	}
+#endif
 
 	if(MaxBlock != -1)
 	{
@@ -2322,6 +2447,9 @@ void CalculateAmplitudes(AudioSignal *Signal, double ZeroDbMagReference, paramet
 		return;
 
 	//Calculate Amplitude in dBFS 
+#ifdef OPENMP_ENABLE
+	#pragma omp parallel for
+#endif
 	for(int block = 0; block < config->types.totalBlocks; block++)
 	{
 		int			type = TYPE_NOTYPE;
@@ -2369,6 +2497,9 @@ void CleanMatched(AudioSignal *ReferenceSignal, AudioSignal *TestSignal, paramet
 {
 	long int size = 0;
 
+#ifdef OPENMP_ENABLE
+	#pragma omp parallel for
+#endif
 	for(int block = 0; block < config->types.totalBlocks; block++)
 	{
 		size = GetBlockFreqSize(ReferenceSignal, block, CHANNEL_LEFT, config);
@@ -2391,6 +2522,9 @@ void CleanMatched(AudioSignal *ReferenceSignal, AudioSignal *TestSignal, paramet
 		}
 	}
 
+#ifdef OPENMP_ENABLE
+	#pragma omp parallel for
+#endif
 	for(int block = 0; block < config->types.totalBlocks; block++)
 	{
 		size = GetBlockFreqSize(TestSignal, block, CHANNEL_LEFT, config);
