@@ -4,7 +4,25 @@ MDFourier is an open source software solution created to compare audio signature
 
 The information gathered from the comparison results can be used in a variety of ways: to identify how audio signatures vary between systems, to detect if the audio signals are modified by audio equipment, to find if modifications resulted in audible changes, to help tune emulators, FPGA implementations or mods, etc.
 
-## Compiling the source 
+## Multi-core Processor Support
+
+MDFourier now includes OpenMP support for improved performance on modern multi-core processors. The software automatically parallelizes computationally intensive operations including:
+
+- Frequency analysis and normalization across audio blocks
+- Maximum magnitude detection using parallel reduction
+- Amplitude calculation and normalization
+- Statistical computations (mean, standard deviation)
+- Plot generation
+
+By default, OpenMP is enabled on Linux, Windows (MinGW/MSYS), Cygwin, and macOS builds. The software will automatically utilize all available CPU cores for faster processing of large audio files.
+
+To control the number of threads used, set the `OMP_NUM_THREADS` environment variable before running MDFourier:
+```bash
+export OMP_NUM_THREADS=4  # Use 4 threads
+./mdfourier -P profile.mdf -r reference.wav -c compare.wav
+```
+
+## Compiling the source
 MDFourier needs a few libraries to be compiled. In Linux, UN*X based systems and MinGW2; you can link it against the latest versions of the libraries.
 
 - Fastest Fourier Transform in the West. (fftw): http://www.fftw.org/download.html

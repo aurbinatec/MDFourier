@@ -82,17 +82,17 @@ cygwin: LFLAGS = $(LOCAL_LINK) $(BASE_LIBS) -Wl,--strip-all
 cygwin: executable
 
 #flags for mac
-mac: CCFLAGS    = $(BASE_CCFLAGS) $(OPT)
+mac: CCFLAGS    = $(BASE_CCFLAGS) $(OPT) $(OPENMP)
 mac: LFLAGS     = -Wl,-no_compact_unwind -logg $(BASE_LIBS)
 mac: executable
 
 #flags for apple silicon mac
-macarm: CCFLAGS    = -I/opt/homebrew/include $(BASE_CCFLAGS) $(OPT)
+macarm: CCFLAGS    = -I/opt/homebrew/include $(BASE_CCFLAGS) $(OPT) $(OPENMP)
 macarm: LFLAGS     = -L/opt/homebrew/lib -Wl,-no_compact_unwind -logg $(BASE_LIBS)
 macarm: executable
 
 #flags for powerpc mac
-macppc: CCFLAGS    = -I/usr/X11R6/include/ $(filter-out -Wpedantic,$(BASE_CCFLAGS)) $(OPT)
+macppc: CCFLAGS    = -I/usr/X11R6/include/ $(filter-out -Wpedantic,$(BASE_CCFLAGS)) $(OPT) $(OPENMP)
 macppc: LFLAGS     = -L/usr/X11R6/lib/ -Wl,-logg $(BASE_LIBS) -lx11 -lxext -lxt -lmx -lxaw -lsm -lice -lxmu -lxpm
 macppc: executable
 
